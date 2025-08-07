@@ -1,64 +1,35 @@
-using System;
 using UnityEngine;
 
 public class EnemyWakame : BaseEnemy
 {
+    [Header("Wakame固有設定")]
     [SerializeField]
-    private LayerMask _targetMask; // 当たり判定対象のレイヤーマスク
-
-    [SerializeField, Required]
     private BulletMove _bulletPrefab; // 弾丸プレハブ
+    [SerializeField]
+    private Transform _muzzle; // 銃口
 
-    public override void FixedUpdateNetwork()
-    {
-        // HasStateAuthority：サーバー もしくは ホストの場合Trueを返す
-        // おそらくホスト側のみで処理させようとしている
-        if (!HasStateAuthority) return;
-        SearchTarget();
-
-        if (_targetBattleship != null)
-        {
-            DoRotation(_targetBattleship.position - transform.position);
-            AttackTarget();
-        }
-        //transform.position += transform.forward * Runner.DeltaTime;
-    }
+    private float _lastAttackTime = -999f;
+    private const float ATTACK_COOLDOWN = 2.0f; // 2秒のクールダウン
 
     public override void Initialize()
     {
-
+        // Wakame固有の初期化処理があればここに記述
     }
 
     public override void AttackTarget()
     {
-        Vector3 targetDirection = (_targetBattleship.position - transform.position).normalized;
-
-        BulletMove bullet = Runner.Spawn(_bulletPrefab, transform.position + targetDirection * 2, Quaternion.identity);
-        bullet.Init(targetDirection);
-    }
-
-    private void SearchTarget()
-    {
-        // レイヤーマスクを使用してターゲットを検索
-        Collider[] targets = Physics.OverlapSphere(transform.position, 10f, _targetMask);
-
-        foreach (var target in targets)
+        // HasStateAuthorityのチェックは呼び出し元(EnemyAIBrain)で行う想定
+        if (Runner.Tick > _lastAttackTime + (ATTACK_COOLDOWN * Runner.TickRate))
         {
-            // ターゲットに対する処理
+             _lastAttackTime = Runner.Tick;
 
-            _targetBattleship = target.transform;
+            // 弾を発射
+            if (_bulletPrefab != null && _muzzle != null)
+            {
+                Vector3 targetDirection = (_muzzle.forward).normalized;
+                Runner.Spawn(_bulletPrefab, _muzzle.position, Quaternion.LookRotation(targetDirection));
+                // bullet.Init()のような初期化処理はBullet側で行う想定
+            }
         }
     }
-
-    private void DoRotation(Vector3 targetDirection)
-    {
-        // Y成分を0にしてY軸回転のみにする
-        targetDirection.y = 0f;
-
-        // 正規化してからキャラクターの回転を設定
-        targetDirection.Normalize();
-
-        transform.rotation = Quaternion.LookRotation(targetDirection);
-    }
-
 }
